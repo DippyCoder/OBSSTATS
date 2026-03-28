@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>OBS Stats Overlay</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Orbitron:wght@400;700&family=JetBrains+Mono:wght@400;700&family=Bebas+Neue&family=Syne:wght@700;800&family=IBM+Plex+Mono:wght@400;700&family=Space+Grotesk:wght@400;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ═══ OVERLAY ═══ */
+    html, body { background: transparent; }
+
+    #overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-wrap: wrap;
+      pointer-events: none;
+    }
+
+    .stat { transition: all 0.25s ease; overflow: hidden; }
+    html, body { background: transparent !important; }
+
+    /* ═══ PANEL ═══ */
+    #panel {
+      display: none;
+      min-height: 100vh;
+      background: #0d0d0f;
+      color: #e8e8f0;
+      font-family: 'Poppins', sans-serif;
+      padding: 20px;
+    }
+
+    #panel h1 { font-size: 1.2rem; font-weight: 700; margin-bottom: 16px; color: #fff; display: flex; align-items: center; gap: 8px; }
+    #panel h1 span { font-size: 0.6rem; background: #2a2a3a; color: #7c7cff; border-radius: 6px; padding: 3px 8px; font-weight: 600; letter-spacing: 0.06em; }
+
+    .tabs { display: flex; gap: 6px; margin-bottom: 18px; border-bottom: 1px solid #1e1e2e; padding-bottom: 10px; flex-wrap: wrap; }
+    .tab { padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 0.78rem; font-weight: 600; color: #666; background: transparent; border: none; transition: all 0.2s; font-family: inherit; }
+    .tab.active { background: #1e1e2e; color: #7c7cff; }
+    .tab:hover:not(.active) { color: #aaa; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+
+    .card { background: #141420; border: 1px solid #1e1e2e; border-radius: 12px; padding: 14px; transition: opacity 0.2s, transform 0.2s; }
+    .card h2 { font-size: 0.7rem; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+    .card .big-val { font-size: 2rem; font-weight: 700; color: #fff; line-height: 1; margin-bottom: 12px; }
+    .card .buttons { display: flex; gap: 6px; margin-bottom: 8px; }
+    .card .buttons button { flex: 1; padding: 6px; border-radius: 8px; border: 1px solid #2a2a3a; background: #1a1a2e; color: #ccc; font-size: 1rem; cursor: pointer; transition: background 0.15s; font-family: inherit; }
+    .card .buttons button:hover { background: #252540; color: #fff; }
+    .card .remove { width: 100%; padding: 5px; border-radius: 8px; border: 1px solid #3a1a1a; background: transparent; color: #a05; font-size: 0.72rem; cursor: pointer; transition: background 0.15s; font-family: inherit; }
+    .card .remove:hover { background: #3a0a0a; color: #f55; }
+
+    .add-btn { padding: 9px 20px; border-radius: 10px; border: none; background: #3a3aff; color: #fff; font-weight: 700; font-size: 0.82rem; cursor: pointer; transition: background 0.2s; font-family: inherit; }
+    .add-btn:hover { background: #5050ff; }
+
+    .cust-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+    .cust-card { background: #141420; border: 1px solid #1e1e2e; border-radius: 12px; padding: 16px; }
+    .cust-card h3 { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: #555; margin-bottom: 12px; font-weight: 700; }
+
+    .field { margin-bottom: 10px; }
+    .field label { display: block; font-size: 0.75rem; color: #888; margin-bottom: 4px; font-weight: 500; }
+    .field input[type=range] { width: 100%; accent-color: #7c7cff; cursor: pointer; }
+    .field input[type=color] { width: 40px; height: 28px; border: none; border-radius: 6px; cursor: pointer; background: none; padding: 0; }
+    .field input[type=text], .field select { width: 100%; padding: 6px 9px; border-radius: 8px; border: 1px solid #2a2a3a; background: #0d0d15; color: #ddd; font-size: 0.78rem; font-family: inherit; outline: none; }
+    .field input[type=text]:focus, .field select:focus { border-color: #7c7cff; }
+    .field .row { display: flex; align-items: center; gap: 8px; }
+    .field .val { font-size: 0.72rem; color: #666; min-width: 38px; text-align: right; white-space: nowrap; }
+
+    #preview-wrap { display: flex; justify-content: center; align-items: center; padding: 24px; background: repeating-conic-gradient(#111 0% 25%, #0d0d0d 0% 50%) 0 0 / 16px 16px; border-radius: 10px; border: 1px solid #1e1e2e; margin-bottom: 18px; min-height: 80px; }
+
+    #ws-status { display: inline-flex; align-items: center; gap: 6px; font-size: 0.7rem; color: #555; padding: 4px 10px; background: #111; border-radius: 20px; margin-bottom: 16px; }
+    #ws-dot { width: 7px; height: 7px; border-radius: 50%; background: #f55; transition: background 0.3s; }
+    #ws-dot.ok { background: #4f4; }
+
+    .pos-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 4px; width: 84px; }
+    .pos-cell { width: 26px; height: 26px; border-radius: 5px; border: 1px solid #2a2a3a; background: #111; cursor: pointer; transition: background 0.15s; }
+    .pos-cell.active { background: #3a3aff; border-color: #3a3aff; }
+    .pos-cell:hover:not(.active) { background: #1e1e3e; }
+
+    #css-export { width: 100%; height: 100px; background: #080810; border: 1px solid #1e1e2e; border-radius: 8px; padding: 8px; color: #7c7cff; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; resize: vertical; outline: none; }
+  </style>
+</head>
+<body>
+
+<div id="overlay"></div>
+
+<div id="panel">
+  <h1>Stats Overlay <span>CONTROL</span></h1>
+  <div id="ws-status"><div id="ws-dot"></div><span id="ws-label">Connecting…</span></div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('stats')">Stats</button>
+    <button class="tab" onclick="switchTab('style')">Style</button>
+    <button class="tab" onclick="switchTab('layout')">Layout</button>
+  </div>
+
+  <!-- STATS -->
+  <div class="tab-content active" id="tab-stats">
+    <div id="grid"></div>
+    <button class="add-btn" onclick="addStat()">+ Add Stat</button>
+  </div>
+
+  <!-- STYLE -->
+  <div class="tab-content" id="tab-style">
+    <div id="preview-wrap"><div class="stat" id="preview-stat">Kills: 42</div></div>
+    <div class="cust-grid">
+
+      <div class="cust-card">
+        <h3>Typography</h3>
+        <div class="field"><label>Font</label>
+          <select id="c-font" onchange="applyAndSend()">
+            <option value="'Poppins',sans-serif">Poppins</option>
+            <option value="'Orbitron',sans-serif">Orbitron</option>
+            <option value="'JetBrains Mono',monospace">JetBrains Mono</option>
+            <option value="'Bebas Neue',cursive">Bebas Neue</option>
+            <option value="'Syne',sans-serif">Syne</option>
+            <option value="'IBM Plex Mono',monospace">IBM Plex Mono</option>
+            <option value="'Space Grotesk',sans-serif">Space Grotesk</option>
+            <option value="'DM Serif Display',serif">DM Serif Display</option>
+          </select>
+        </div>
+        <div class="field"><label>Size</label>
+          <div class="row"><input type="range" id="c-font-size" min="10" max="72" value="22" oninput="applyAndSend();this.nextElementSibling.textContent=this.value+'px'"><span class="val">22px</span></div>
+        </div>
+        <div class="field"><label>Weight</label>
+          <select id="c-font-weight" onchange="applyAndSend()">
+            <option value="400">Regular</option><option value="600">SemiBold</option><option value="700" selected>Bold</option><option value="800">ExtraBold</option>
+          </select>
+        </div>
+        <div class="field"><label>Letter Spacing</label>
+          <div class="row"><input type="range" id="c-letter-spacing" min="-2" max="12" step="0.5" value="0" oninput="applyAndSend();this.nextElementSibling.textContent=this.value+'px'"><span class="val">0px</span></div>
+        </div>
+      </div>
+
+      <div class="cust-card">
+        <h3>Colors</h3>
+        <div class="field"><label>Text Color</label>
+          <div class="row"><input type="color" id="c-text-color" value="#ffffff" oninput="g('c-text-color-hex').value=this.value;applyAndSend()"><input type="text" id="c-text-color-hex" value="#ffffff" oninput="applyAndSend()" style="flex:1"></div>
+        </div>
+        <div class="field"><label>Background</label>
+          <div class="row"><input type="color" id="c-bg-color" value="#000000" oninput="g('c-bg-color-hex').value=this.value;applyAndSend()"><input type="text" id="c-bg-color-hex" value="rgba(0,0,0,0.55)" oninput="applyAndSend()" style="flex:1" placeholder="rgba(0,0,0,0.55)"></div>
+        </div>
+        <div class="field"><label>Border Color</label>
+          <div class="row"><input type="color" id="c-border-color" value="#ffffff" oninput="g('c-border-color-hex').value=this.value;applyAndSend()"><input type="text" id="c-border-color-hex" value="rgba(255,255,255,0.15)" oninput="applyAndSend()" style="flex:1" placeholder="rgba(255,255,255,0.15)"></div>
+        </div>
+        <div class="field"><label>Widget Opacity</label>
+          <div class="row"><input type="range" id="c-opacity" min="0" max="1" step="0.01" value="1" oninput="applyAndSend();this.nextElementSibling.textContent=Math.round(this.value*100)+'%'"><span class="val">100%</span></div>
+        </div>
+      </div>
+
+      <div class="cust-card">
+        <h3>Shape & Padding</h3>
+        <div class="field"><label>Border Radius</label>
+          <div class="row"><input type="range" id="c-radius" min="0" max="50" value="10" oninput="applyAndSend();this.nextElementSibling.textContent=this.value+'px'"><span class="val">10px</span></div>
+        </div>
+        <div class="field"><label>Border Width</label>
+          <div class="row"><input type="range" id="c-border-width" min="0" max="6" value="1" oninput="applyAndSend();this.nextElementSibling.textContent=this.value+'px'"><span class="val">1px</span></div>
+        </div>
+        <div class="field"><label>Padding X</label>
+          <div class="row"><input type="range" id="c-pad-x" min="0" max="60" value="18" oninput="applyAndSend();this.nextElementSibling.textContent=this.value+'px'"><span class="val">18px</span></div>
+        </div>
+        <div class="field"><label>Padding Y</label>
+          <div class="row"><input type="range" id="c-pad-y" min="0" max="40" value="8" oninput="applyAndSend();this.nextElementSibling.textContent=this.value+'px'"><span class="val">8px</span></div>
+        </div>
+      </div>
+
+      <div class="cust-card">
+        <h3>Effects</h3>
+        <div class="field"><label>Backdrop Blur</label>
+          <div class="row"><input type="range" id="c-blur" min="0" max="30" value="8" oninput="applyAndSend();this.nextElementSibling.textContent=this.value+'px'"><span class="val">8px</span></div>
+        </div>
+        <div class="field"><label>Scale</label>
+          <div class="row"><input type="range" id="c-scale" min="0.3" max="3" step="0.05" value="1" oninput="applyAndSend();this.nextElementSibling.textContent=parseFloat(this.value).toFixed(2)+'×'"><span class="val">1.00×</span></div>
+        </div>
+        <div class="field"><label>Drop Shadow</label>
+          <select id="c-shadow" onchange="applyAndSend()">
+            <option value="none">None</option>
+            <option value="0 2px 10px rgba(0,0,0,0.4)" selected>Soft</option>
+            <option value="0 4px 24px rgba(0,0,0,0.6)">Medium</option>
+            <option value="0 8px 40px rgba(0,0,0,0.9)">Heavy</option>
+            <option value="0 0 12px rgba(124,124,255,0.8)">Glow Blue</option>
+            <option value="0 0 12px rgba(255,80,80,0.8)">Glow Red</option>
+            <option value="0 0 12px rgba(80,255,160,0.8)">Glow Green</option>
+            <option value="0 0 12px rgba(255,220,0,0.8)">Glow Gold</option>
+          </select>
+        </div>
+        <div class="field"><label>Text Shadow</label>
+          <select id="c-text-shadow" onchange="applyAndSend()">
+            <option value="none">None</option>
+            <option value="0 1px 4px rgba(0,0,0,0.5)" selected>Soft Dark</option>
+            <option value="0 0 8px rgba(255,255,255,0.8)">White Glow</option>
+            <option value="0 0 8px rgba(124,124,255,0.9)">Blue Glow</option>
+            <option value="1px 1px 0 #000,2px 2px 0 #000">Hard Outline</option>
+          </select>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- LAYOUT -->
+  <div class="tab-content" id="tab-layout">
+    <div class="cust-grid">
+
+      <div class="cust-card">
+        <h3>Position Anchor</h3>
+        <div class="field">
+          <div class="pos-grid" id="pos-grid">
+            <div class="pos-cell active" data-ai="flex-start" data-ji="flex-start" onclick="setPos(this)"></div>
+            <div class="pos-cell" data-ai="flex-start" data-ji="center" onclick="setPos(this)"></div>
+            <div class="pos-cell" data-ai="flex-start" data-ji="flex-end" onclick="setPos(this)"></div>
+            <div class="pos-cell" data-ai="center" data-ji="flex-start" onclick="setPos(this)"></div>
+            <div class="pos-cell" data-ai="center" data-ji="center" onclick="setPos(this)"></div>
+            <div class="pos-cell" data-ai="center" data-ji="flex-end" onclick="setPos(this)"></div>
+            <div class="pos-cell" data-ai="flex-end" data-ji="flex-start" onclick="setPos(this)"></div>
+            <div class="pos-cell" data-ai="flex-end" data-ji="center" onclick="setPos(this)"></div>
+            <div class="pos-cell" data-ai="flex-end" data-ji="flex-end" onclick="setPos(this)"></div>
+          </div>
+        </div>
+        <div class="field" style="margin-top:10px"><label>Direction</label>
+          <select id="c-direction" onchange="applyAndSend()">
+            <option value="row">Horizontal</option>
+            <option value="column">Vertical</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="cust-card">
+        <h3>Spacing</h3>
+        <div class="field"><label>Gap</label>
+          <div class="row"><input type="range" id="c-gap" min="0" max="40" value="10" oninput="applyAndSend();this.nextElementSibling.textContent=this.value+'px'"><span class="val">10px</span></div>
+        </div>
+        <div class="field"><label>Overlay Padding</label>
+          <div class="row"><input type="range" id="c-overlay-pad" min="0" max="80" value="16" oninput="applyAndSend();this.nextElementSibling.textContent=this.value+'px'"><span class="val">16px</span></div>
+        </div>
+      </div>
+
+      <div class="cust-card">
+        <h3>OBS Custom CSS</h3>
+        <div class="field">
+          <label style="margin-bottom:6px">Paste into Browser Source → Custom CSS:</label>
+          <textarea id="css-export" readonly></textarea>
+          <button class="add-btn" style="margin-top:8px;font-size:0.72rem;padding:6px 14px" onclick="copyCSS(event)">Copy</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  const isControl = new URLSearchParams(location.search).has("control");
+  const overlay   = document.getElementById("overlay");
+  const panelEl   = document.getElementById("panel");
+
+  if (isControl) {
+    document.body.style.background = "#0d0d0f";
+    document.body.style.overflow   = "auto";
+    overlay.style.display = "none";
+    panelEl.style.display = "block";
+  }
+
+  /* ═══ State ═══ */
+  let state = { stats: {}, style: {} };
+  let currentPos = { ai: "flex-start", ji: "flex-start" };
+
+  /* ═══ WebSocket ═══ */
+  let ws, reconnectTimer;
+
+  function connect() {
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    const host  = location.hostname || "localhost";
+    ws = new WebSocket(`${proto}://${host}:3000`);
+
+    ws.onopen = () => {
+      document.getElementById("ws-dot").className = "ok";
+      document.getElementById("ws-label").textContent = "Connected";
+      clearTimeout(reconnectTimer);
+    };
+
+    ws.onclose = () => {
+      document.getElementById("ws-dot").className = "";
+      document.getElementById("ws-label").textContent = "Disconnected – retrying…";
+      reconnectTimer = setTimeout(connect, 3000);
+    };
+
+    ws.onerror = () => ws.close();
+
+    ws.onmessage = e => {
+      try {
+        const data = JSON.parse(e.data);
+        state.stats = data.stats || {};
+        if (data.style && Object.keys(data.style).length) {
+          state.style = data.style;
+          if (isControl) loadStyleIntoInputs();
+        }
+      } catch { return; }
+      renderOverlay();
+      if (isControl) renderCards();
+    };
+  }
+
+  connect();
+
+  function send() {
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(state));
+  }
+
+  /* ═══ Helpers ═══ */
+  function g(id) { return document.getElementById(id); }
+
+  function applyStyleToEl(el, s) {
+    el.style.fontFamily     = s.font          || "'Poppins',sans-serif";
+    el.style.fontSize       = (s.fontSize     || "22") + "px";
+    el.style.fontWeight     = s.fontWeight     || "700";
+    el.style.letterSpacing  = (s.letterSpacing || "0") + "px";
+    el.style.color          = s.textColor      || "#ffffff";
+    el.style.background     = s.bgColor        || "rgba(0,0,0,0.55)";
+    el.style.border         = `${s.borderWidth||"1"}px solid ${s.borderColor||"rgba(255,255,255,0.15)"}`;
+    el.style.borderRadius   = (s.radius        || "10") + "px";
+    el.style.padding        = `${s.padY||"8"}px ${s.padX||"18"}px`;
+    // backdrop-filter disabled — breaks OBS transparency (renders black)
+    // el.style.backdropFilter = `blur(${s.blur || "8"}px)`;
+    el.style.boxShadow      = s.shadow         || "0 2px 10px rgba(0,0,0,0.4)";
+    el.style.textShadow     = s.textShadow     || "0 1px 4px rgba(0,0,0,0.5)";
+    el.style.opacity        = s.opacity        || "1";
+    el.style.transform      = `scale(${s.scale||"1"})`;
+    el.style.transformOrigin= "top left";
+    el.style.display        = "inline-block";
+    el.style.overflow       = "hidden";
+  }
+
+  /* ═══ Overlay ═══ */
+  function renderOverlay() {
+    overlay.innerHTML = "";
+    const s = state.style;
+    overlay.style.flexDirection  = s.direction      || "row";
+    overlay.style.alignItems     = s.alignItems     || "flex-start";
+    overlay.style.justifyContent = s.justifyContent || "flex-start";
+    overlay.style.gap            = (s.gap           || "10") + "px";
+    overlay.style.padding        = (s.overlayPad    || "16") + "px";
+    overlay.style.flexWrap       = "wrap";
+
+    for (const key in state.stats) {
+      const div = document.createElement("div");
+      div.className = "stat";
+      div.textContent = `${key}: ${state.stats[key]}`;
+      applyStyleToEl(div, s);
+      overlay.appendChild(div);
+    }
+  }
+
+  /* ═══ Preview ═══ */
+  function renderPreview() {
+    const el = g("preview-stat");
+    if (el) applyStyleToEl(el, state.style);
+  }
+
+  /* ═══ Cards ═══ */
+  function renderCards() {
+    const grid = g("grid");
+    grid.innerHTML = "";
+    for (const key in state.stats) {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <h2>${key}</h2>
+        <div class="big-val" id="val-${CSS.escape(key)}">${state.stats[key]}</div>
+        <div class="buttons">
+          <button onclick="change('${key}',1)">+</button>
+          <button onclick="change('${key}',-1)">−</button>
+        </div>
+        <button class="remove" onclick="removeStat('${key}',this.closest('.card'))">Remove</button>
+      `;
+      grid.appendChild(card);
+    }
+  }
+
+  /* ═══ Stat actions ═══ */
+  function change(key, delta) {
+    state.stats[key] = (state.stats[key] || 0) + delta;
+    const el = g("val-" + CSS.escape(key));
+    if (el) el.textContent = state.stats[key];
+    renderOverlay();
+    send();
+  }
+
+  function removeStat(key, cardEl) {
+    cardEl.style.opacity = "0"; cardEl.style.transform = "scale(0.9)"; cardEl.style.transition = "all 0.2s";
+    setTimeout(() => { delete state.stats[key]; renderCards(); renderOverlay(); send(); }, 200);
+  }
+
+  function addStat() {
+    const name = prompt("Stat name:");
+    if (!name || !name.trim()) return;
+    state.stats[name.trim()] = 0;
+    renderCards(); renderOverlay(); send();
+  }
+
+  /* ═══ Style: read inputs → state.style → broadcast ═══ */
+  function applyAndSend() {
+    state.style = {
+      font:           g("c-font").value,
+      fontSize:       g("c-font-size").value,
+      fontWeight:     g("c-font-weight").value,
+      letterSpacing:  g("c-letter-spacing").value,
+      textColor:      g("c-text-color-hex").value || g("c-text-color").value,
+      bgColor:        g("c-bg-color-hex").value   || g("c-bg-color").value,
+      borderColor:    g("c-border-color-hex").value || g("c-border-color").value,
+      borderWidth:    g("c-border-width").value,
+      radius:         g("c-radius").value,
+      padX:           g("c-pad-x").value,
+      padY:           g("c-pad-y").value,
+      blur:           g("c-blur").value,
+      scale:          g("c-scale").value,
+      shadow:         g("c-shadow").value,
+      textShadow:     g("c-text-shadow").value,
+      opacity:        g("c-opacity").value,
+      direction:      g("c-direction").value,
+      gap:            g("c-gap").value,
+      overlayPad:     g("c-overlay-pad").value,
+      alignItems:     currentPos.ai,
+      justifyContent: currentPos.ji,
+    };
+    renderPreview();
+    renderOverlay();
+    send();
+    buildCSSExport();
+  }
+
+  /* load incoming style state back into inputs */
+  function loadStyleIntoInputs() {
+    const s = state.style;
+    const set = (id, val) => { if (val !== undefined && g(id)) g(id).value = val; };
+    set("c-font", s.font);
+    set("c-font-size", s.fontSize);
+    set("c-font-weight", s.fontWeight);
+    set("c-letter-spacing", s.letterSpacing);
+    set("c-text-color", s.textColor);
+    set("c-text-color-hex", s.textColor);
+    set("c-bg-color-hex", s.bgColor);
+    set("c-border-color", s.borderColor);
+    set("c-border-color-hex", s.borderColor);
+    set("c-border-width", s.borderWidth);
+    set("c-radius", s.radius);
+    set("c-pad-x", s.padX);
+    set("c-pad-y", s.padY);
+    set("c-blur", s.blur);
+    set("c-scale", s.scale);
+    set("c-shadow", s.shadow);
+    set("c-text-shadow", s.textShadow);
+    set("c-opacity", s.opacity);
+    set("c-direction", s.direction);
+    set("c-gap", s.gap);
+    set("c-overlay-pad", s.overlayPad);
+    // refresh range labels
+    document.querySelectorAll("input[type=range]").forEach(r => {
+      const lbl = r.nextElementSibling;
+      if (!lbl || !lbl.classList.contains("val")) return;
+      if (r.id === "c-scale") lbl.textContent = parseFloat(r.value).toFixed(2) + "×";
+      else if (r.id === "c-opacity") lbl.textContent = Math.round(r.value*100) + "%";
+      else lbl.textContent = r.value + "px";
+    });
+    if (s.alignItems && s.justifyContent) {
+      const cell = document.querySelector(`.pos-cell[data-ai="${s.alignItems}"][data-ji="${s.justifyContent}"]`);
+      if (cell) { document.querySelectorAll(".pos-cell").forEach(c => c.classList.remove("active")); cell.classList.add("active"); currentPos = { ai: s.alignItems, ji: s.justifyContent }; }
+    }
+    renderPreview();
+  }
+
+  /* ═══ Position ═══ */
+  function setPos(cell) {
+    document.querySelectorAll(".pos-cell").forEach(c => c.classList.remove("active"));
+    cell.classList.add("active");
+    currentPos = { ai: cell.dataset.ai, ji: cell.dataset.ji };
+    applyAndSend();
+  }
+
+  /* ═══ Tabs ═══ */
+  function switchTab(id) {
+    const ids = ["stats","style","layout"];
+    document.querySelectorAll(".tab").forEach((t,i) => t.classList.toggle("active", ids[i]===id));
+    document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
+    g("tab-"+id).classList.add("active");
+    if (id === "layout") buildCSSExport();
+  }
+
+  /* ═══ CSS Export ═══ */
+  function buildCSSExport() {
+    const s = state.style;
+    if (!s || !Object.keys(s).length) return;
+    const css = `.stat {
+  font-family: ${s.font||"'Poppins',sans-serif"};
+  font-size: ${s.fontSize||22}px;
+  font-weight: ${s.fontWeight||700};
+  letter-spacing: ${s.letterSpacing||0}px;
+  color: ${s.textColor||"#fff"};
+  background: ${s.bgColor||"rgba(0,0,0,0.55)"};
+  border: ${s.borderWidth||1}px solid ${s.borderColor||"rgba(255,255,255,0.15)"};
+  border-radius: ${s.radius||10}px;
+  padding: ${s.padY||8}px ${s.padX||18}px;
+  /* backdrop-filter: blur(${s.blur||8}px); — disabled, breaks OBS transparency */
+  box-shadow: ${s.shadow||"none"};
+  text-shadow: ${s.textShadow||"none"};
+  opacity: ${s.opacity||1};
+  transform: scale(${s.scale||1});
+  transform-origin: top left;
+  display: inline-block;
+}`;
+    const el = g("css-export");
+    if (el) el.value = css;
+  }
+
+  function copyCSS(e) {
+    const el = g("css-export");
+    el.select();
+    navigator.clipboard.writeText(el.value).then(() => {
+      e.target.textContent = "Copied!";
+      setTimeout(() => e.target.textContent = "Copy", 1500);
+    });
+  }
+
+  // init preview with defaults
+  renderPreview();
+</script>
+</body>
+</html>
