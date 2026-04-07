@@ -25,3 +25,10 @@ Questions:
             - https://www.youtube.com/watch?v=0gWGIl32-cw by CreoVox | Streamlabs OBS
     - How to Make a 'Web Dock'?
         -> Depending on whether you are using OBS Studio or Streamlabs OBS: here are 2 tutorials:
+            - https://youtube.com/shorts/UMNl_E7xUgI?si=Zxkxgy_MD4vTBDkT by calscreation | OBS Studio
+            - https://youtu.be/VfX12T1p8Z8?si=Okz3SSJZG9-Vyatq by ReaperDigital | Streamlabs OBS
+    - How to change the port?
+        -> To change the port you have to change multiple things:
+            - change 'const PORT = 3000;' to 'const PORT = [NEW-PORT];', this is located in server.js, line 6
+            - change 'ws = new WebSocket(`${proto}://${host}:3000`);' to 'ws = new WebSocket(`${proto}://${host}:[NEW-PORT]`);', this is located in index.html, line 276
+            - change 'reconnectTimer = setTimeout(connect, 3000);' to 'reconnectTimer = setTimeout(connect, [NEW-PORT]);', this is located in index.html, line 287
